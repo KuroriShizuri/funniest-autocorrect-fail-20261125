@@ -36,6 +36,13 @@ def write_entry(out_dir: str) -> str:
         data = f.read()
     if data != LINE.encode("utf-8"):
         raise ValueError("entry.txt is not byte-identical to the line")
+    # Re-validate the file on disk itself (non-empty, 1-199 chars) so a
+    # bad artifact fails the run instead of shipping silently.
+    try:
+        written = data.decode("utf-8")
+    except UnicodeDecodeError:
+        raise ValueError("entry.txt is not valid UTF-8")
+    validate(written)
     return path
 
 
@@ -47,6 +54,14 @@ def main(argv=None) -> int:
                         help="validate + byte-identical write/read "
                              "round-trip in a temp dir")
     args = parser.parse_args(argv)
+    try:
+        return _run(args)
+    except ValueError as exc:
+        print(f"invalid entry: {exc}", file=sys.stderr)
+        return 1
+
+
+def _run(args) -> int:
     if args.check:
         validate(LINE)
         print(f"OK: {len(LINE)} chars, gate 1-199")
